@@ -1,0 +1,107 @@
+# ============================================================
+# docker-compose.yml — Orquestra todos os serviços
+#
+# Serviços:
+#   postgres  → banco de dados PostgreSQL
+#   redis     → cache e fila de mensagens (BullMQ)
+#   api       → backend Fastify (porta 3001)
+#   web       → frontend Next.js (porta 3000)
+#
+# Como usar:
+#   Subir tudo:        docker compose up -d
+#   Ver logs:          docker compose logs -f
+#   Parar tudo:        docker compose down
+#   Rebuild:           docker compose up -d --build
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # PostgreSQL — banco de dados relacional
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: whatsapp-bot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: botuser
+      POSTGRES_PASSWORD: botpassword
+      POSTGRES_DB: whatsappbot
+    ports:
+      - "5432:5432"
+    volumes:
+      # Persiste os dados mesmo se o container for destruído
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U botuser -d whatsappbot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------
+  # Redis — cache e fila de mensagens (BullMQ)
+  # ----------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: whatsapp-bot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------
+  # API — backend Fastify
+  # Depende do postgres e redis estarem prontos (healthy)
+  # ----------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: whatsapp-bot-api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      # "postgres" é o nome do serviço acima — o Docker resolve automaticamente
+      DATABASE_URL: postgresql://botuser:botpassword@postgres:5432/whatsappbot
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ----------------------------------------------------------
+  # Web — frontend Next.js
+  # ----------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # URL da API acessível pelo browser do usuário
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    container_name: whatsapp-bot-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - api
+
+# ----------------------------------------------------------
+# Volumes nomeados — dados persistem entre restarts
+# ----------------------------------------------------------
+volumes:
+  postgres_data:
+  redis_data:

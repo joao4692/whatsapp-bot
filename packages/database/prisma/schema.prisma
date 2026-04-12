@@ -1,0 +1,78 @@
+// ============================================================
+// schema.prisma — Modelo do banco de dados
+//
+// Aqui definimos as tabelas do banco de dados.
+// O Prisma lê esse arquivo e cria as tabelas no PostgreSQL.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------------
+// Tenant — Empresa cliente
+// Cada empresa que usar o sistema é um tenant.
+// Todos os dados ficam separados por tenant.
+// ------------------------------------------------------------
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+
+  @@map("tenants")
+}
+
+// ------------------------------------------------------------
+// User — Usuário do painel (admin ou agente)
+// ------------------------------------------------------------
+model User {
+  id        String   @id @default(cuid())
+  tenantId  String
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(AGENT)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+// ------------------------------------------------------------
+// RefreshToken — Token de renovação de sessão
+// ------------------------------------------------------------
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ------------------------------------------------------------
+// Enums — valores fixos
+// ------------------------------------------------------------
+enum Role {
+  ADMIN
+  AGENT
+}

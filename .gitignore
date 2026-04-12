@@ -1,0 +1,53 @@
+# ============================================================
+# .gitignore — WhatsApp Bot Monorepo
+# ============================================================
+
+# ----- Dependências -----
+node_modules/
+.pnpm-store/
+
+# ----- Build outputs -----
+dist/
+build/
+.next/
+out/
+
+# ----- Variáveis de ambiente (NUNCA subir para o git) -----
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# ----- Prisma: cliente gerado (recriado com prisma generate) -----
+**/generated/prisma/
+src/generated/
+
+# ----- Logs -----
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ----- Cache -----
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# ----- Sistema operacional -----
+.DS_Store
+Thumbs.db
+
+# ----- IDEs e editores -----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ----- Claude Code (dados internos do assistente) -----
+.claude/
+
+# ----- Sessões WhatsApp (serão geradas em runtime) -----
+sessions/
+auth_info_baileys/
