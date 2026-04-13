@@ -12,6 +12,11 @@
     "typescript": "^5.4.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["prisma", "@prisma/client"]
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "msgpackr-extract",
+      "prisma",
+      "protobufjs"
+    ]
   }
 }

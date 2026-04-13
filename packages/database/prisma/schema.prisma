@@ -26,7 +26,11 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users User[]
+  users               User[]
+  whatsappConnections WhatsAppConnection[]
+  contacts            Contact[]
+  conversations       Conversation[]
+
 
   @@map("tenants")
 }
@@ -75,4 +79,103 @@ model RefreshToken {
 enum Role {
   ADMIN
   AGENT
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  CONNECTING
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+
+// ------------------------------------------------------------
+// WhatsAppConnection — Número de WhatsApp vinculado
+// ------------------------------------------------------------
+model WhatsAppConnection {
+  id        String           @id @default(cuid())
+  tenantId  String
+  name      String
+  phone     String?
+  status    ConnectionStatus @default(DISCONNECTED)
+  sessionData String?        @db.Text
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@index([tenantId])
+  @@map("whatsapp_connections")
+}
+
+// ------------------------------------------------------------
+// Contact — Cliente que envia mensagens
+// ------------------------------------------------------------
+model Contact {
+  id           String   @id @default(cuid())
+  tenantId     String
+  phone        String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+  @@map("contacts")
+}
+
+// ------------------------------------------------------------
+// Conversation — Conversa entre contato e empresa
+// ------------------------------------------------------------
+model Conversation {
+  id           String             @id @default(cuid())
+  tenantId     String
+  connectionId String
+  contactId    String
+  status       ConversationStatus @default(OPEN)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection WhatsAppConnection @relation(fields: [connectionId], references: [id])
+  contact    Contact            @relation(fields: [contactId], references: [id])
+  messages   Message[]
+
+  @@index([tenantId])
+  @@index([connectionId])
+  @@index([contactId])
+  @@map("conversations")
+}
+
+
+// ------------------------------------------------------------
+// Message — Mensagem dentro de uma conversa
+// ------------------------------------------------------------
+model Message {
+  id             String      @id @default(cuid())
+  conversationId String
+  body           String      @db.Text
+  fromMe         Boolean     @default(false)
+  status         MessageStatus @default(SENT)
+  wamId          String?     @unique
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("messages")
 }

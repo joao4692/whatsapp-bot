@@ -6,6 +6,7 @@
 #   redis     → cache e fila de mensagens (BullMQ)
 #   api       → backend Fastify (porta 3001)
 #   web       → frontend Next.js (porta 3000)
+#   worker    → processa mensagens WhatsApp (Baileys)
 #
 # Como usar:
 #   Subir tudo:        docker compose up -d
@@ -30,7 +31,6 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      # Persiste os dados mesmo se o container for destruído
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U botuser -d whatsappbot"]
@@ -57,7 +57,6 @@ services:
 
   # ----------------------------------------------------------
   # API — backend Fastify
-  # Depende do postgres e redis estarem prontos (healthy)
   # ----------------------------------------------------------
   api:
     build:
@@ -69,7 +68,6 @@ services:
       - "3001:3001"
     environment:
       NODE_ENV: production
-      # "postgres" é o nome do serviço acima — o Docker resolve automaticamente
       DATABASE_URL: postgresql://botuser:botpassword@postgres:5432/whatsappbot
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
@@ -88,7 +86,6 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        # URL da API acessível pelo browser do usuário
         NEXT_PUBLIC_API_URL: http://localhost:3001
     container_name: whatsapp-bot-web
     restart: unless-stopped
@@ -99,9 +96,35 @@ services:
     depends_on:
       - api
 
+  # ----------------------------------------------------------
+  # Worker — processa mensagens WhatsApp (Baileys)
+  # ----------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: whatsapp-bot-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://botuser:botpassword@postgres:5432/whatsappbot
+      REDIS_URL: redis://redis:6379
+      TENANT_ID: ${TENANT_ID}
+      CONNECTION_ID: ${CONNECTION_ID}
+    volumes:
+      - worker_sessions:/app/sessions
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 # ----------------------------------------------------------
 # Volumes nomeados — dados persistem entre restarts
 # ----------------------------------------------------------
 volumes:
   postgres_data:
   redis_data:
+  worker_sessions:
+    external: true
+    name: whatsapp-bot_worker_sessions
